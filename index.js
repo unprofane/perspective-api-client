@@ -1,10 +1,11 @@
 'use strict';
-const axios = require('axios');
 const striptags = require('striptags');
-const _ = require('lodash');
 
-const COMMENT_ANALYZER_URL =
-  'https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze';
+// Google's Perspective API stops answering after 2026-12-31. The host is an
+// option (or PERSPECTIVE_API_HOST); the default is Unprofane's drop-in,
+// which answers the same requests with the same JSON.
+const DEFAULT_HOST = 'https://api.unprofane.com';
+const ANALYZE_PATH = '/v1alpha1/comments:analyze';
 const MAX_LENGTH = 20480;
 
 class PerspectiveAPIClientError extends Error {
@@ -37,12 +38,29 @@ class ResponseError extends PerspectiveAPIClientError {
   }
 }
 
+const isObject = value => value && typeof value === 'object' && !Array.isArray(value);
+
+// A deep merge of plain objects, as lodash's merge did for the payload.
+const merge = (target, source) => {
+  const out = Object.assign({}, target);
+  for (const key of Object.keys(source)) {
+    if (source[key] === undefined) {
+      continue;
+    }
+    out[key] = isObject(out[key]) && isObject(source[key]) ? merge(out[key], source[key]) : source[key];
+  }
+  return out;
+};
+
 class Perspective {
   constructor(options) {
     this.options = options || {};
     if (!this.options.apiKey) {
       throw new Error('Must provide options.apiKey');
     }
+    const host = this.options.host || process.env.PERSPECTIVE_API_HOST || DEFAULT_HOST;
+    this.url = host.replace(/\/+$/, '') + ANALYZE_PATH;
+    this.fetch = this.options.fetch || globalThis.fetch;
   }
 
   analyze(text, options) {
@@ -52,16 +70,37 @@ class Perspective {
         resource = this.getAnalyzeCommentPayload(text, options);
       } catch (error) {
         reject(error);
+        return;
       }
-      axios
-        .post(COMMENT_ANALYZER_URL, resource, {
-          params: {key: this.options.apiKey},
+      const url = `${this.url}?key=${encodeURIComponent(this.options.apiKey)}`;
+      this.fetch(url, {
+        method: 'POST',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify(resource),
+      })
+        .then(async res => {
+          const raw = await res.text();
+          let data = raw;
+          try {
+            data = JSON.parse(raw);
+          } catch (_) {}
+          if (res.ok) {
+            resolve(data);
+            return;
+          }
+          const response = {
+            status: res.status,
+            statusText: res.statusText,
+            headers: Object.fromEntries(res.headers),
+            data,
+          };
+          const message =
+            (isObject(data) && isObject(data.error) && data.error.message) ||
+            `Request failed with status code ${res.status}`;
+          reject(new ResponseError(message, response));
         })
-        .then(response => {
-          resolve(response.data);
-        }).catch(error => {
-          const message = _.get(error, 'response.data.error.message', error.message);
-          reject(new ResponseError(message, error.response));
+        .catch(error => {
+          reject(error instanceof ResponseError ? error : new ResponseError(error.message, undefined));
         });
     });
   }
@@ -101,7 +140,7 @@ class Perspective {
         attributes[each.toUpperCase()] = {};
       });
     }
-    return _.merge({}, resource, {
+    return merge(resource, {
       requestedAttributes: attributes,
       doNotStore,
     });
@@ -112,4 +151,5 @@ Perspective.PerspectiveAPIClientError = PerspectiveAPIClientError;
 Perspective.TextEmptyError = TextEmptyError;
 Perspective.TextTooLongError = TextTooLongError;
 Perspective.ResponseError = ResponseError;
+Perspective.DEFAULT_HOST = DEFAULT_HOST;
 module.exports = Perspective;

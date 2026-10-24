@@ -1,58 +1,38 @@
 {
-  "name": "perspective-api-client",
-  "version": "3.1.0",
-  "description": "Client library for the Perspective API",
+  "name": "@unprofane/perspective-api-client",
+  "version": "4.0.0",
+  "description": "Client library for the Perspective API, with the host configurable: Google's until it shuts down after 2026-12-31, or a drop-in such as Unprofane's",
   "license": "MIT",
-  "repository": "sloria/perspective-api-client",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unprofane/perspective-api-client.git"
+  },
+  "homepage": "https://unprofane.com/perspective/node/",
   "author": {
     "name": "Steven Loria",
     "email": "sloria1@gmail.com",
     "url": "stevenloria.com"
   },
+  "contributors": [
+    "Unprofane (https://unprofane.com)"
+  ],
   "engines": {
-    "node": ">=6"
+    "node": ">=18"
   },
   "scripts": {
-    "test": "npm run lint && ava",
-    "lint": "xo",
-    "release": "np",
-    "repl": "local-repl"
+    "test": "node --test test.js"
   },
   "files": [
     "index.js"
   ],
   "keywords": [
     "perspective",
-    "perspective-api"
+    "perspective-api",
+    "perspective-api-alternative",
+    "toxicity",
+    "moderation"
   ],
   "dependencies": {
-    "axios": "^0.21.0",
-    "lodash": "^4.17.4",
-    "striptags": "^3.1.1"
-  },
-  "devDependencies": {
-    "ava": "^0.25.0",
-    "local-repl": "^4.0.0",
-    "nock": "^10.0.6",
-    "np": "^7.0.0",
-    "xo": "^0.23.0"
-  },
-  "xo": {
-    "space": true,
-    "rules": {
-      "eqeqeq": 0,
-      "capitalized-comments": 0,
-      "operator-linebreak": 0,
-      "comma-dangle": [
-        "error",
-        {
-          "arrays": "always-multiline",
-          "objects": "always-multiline",
-          "imports": "always-multiline",
-          "exports": "always-multiline",
-          "functions": "never"
-        }
-      ]
-    }
+    "striptags": "^3.2.0"
   }
 }

@@ -1,204 +1,85 @@
 # perspective-api-client
 
-[![Current Version](https://img.shields.io/npm/v/perspective-api-client.svg)](https://www.npmjs.org/package/perspective-api-client)
-[![Build Status](https://travis-ci.org/sloria/perspective-api-client.svg?branch=master)](https://travis-ci.org/sloria/perspective-api-client)
+[![npm](https://img.shields.io/npm/v/@unprofane/perspective-api-client.svg)](https://www.npmjs.com/package/@unprofane/perspective-api-client)
 
-Node.js client library for the [Perspective API](https://www.perspectiveapi.com/).
+The Node.js client for the Perspective API, from [sloria/perspective-api-client](https://github.com/sloria/perspective-api-client) (archived), with the host configurable. Google's Perspective API stops answering after **2026-12-31**, and the original package hardcodes Google's address. This one posts the same request to any Perspective-compatible host. The default is [Unprofane's drop-in](https://unprofane.com/perspective/), which answers the same `comments:analyze` requests with the same JSON; set `host` to keep using Google's until then.
+
+Maintained by [Unprofane](https://unprofane.com). MIT, like the original.
 
 ## Install
 
+```bash
+npm install @unprofane/perspective-api-client
 ```
-$ npm install perspective-api-client
+
+Or keep every `require('perspective-api-client')` as it is and swap the package under it:
+
+```bash
+npm install perspective-api-client@npm:@unprofane/perspective-api-client
 ```
 
 ## Usage
 
 ```js
-const Perspective = require('perspective-api-client');
+const Perspective = require('@unprofane/perspective-api-client');
+
+// An Unprofane key (unprofane.com/app/), sent as ?key= like Google's.
 const perspective = new Perspective({apiKey: process.env.PERSPECTIVE_API_KEY});
 
 (async () => {
-  const text = 'you empty-headed animal food trough wiper!';
-  const result = await perspective.analyze(text);
-  console.log(JSON.stringify(result, null, 2));
+  const result = await perspective.analyze('you empty-headed animal food trough wiper!');
+  console.log(result.attributeScores.TOXICITY.summaryScore.value);
 })();
-// {
-//   "attributeScores": {
-//     "TOXICITY": {
-//       "spanScores": [
-//         {
-//           "begin": 0,
-//           "end": 42,
-//           "score": {
-//             "value": 0.77587414,
-//             "type": "PROBABILITY"
-//           }
-//         }
-//       ],
-//       "summaryScore": {
-//         "value": 0.77587414,
-//         "type": "PROBABILITY"
-//       }
-//     }
-//   },
-//   "languages": [
-//     "en"
-//   ]
-// }
 ```
+
+### The host
+
+| | |
+|---|---|
+| default | `https://api.unprofane.com` |
+| `new Perspective({apiKey, host})` | any Perspective-compatible host, such as `https://commentanalyzer.googleapis.com` until 2026-12-31 |
+| `PERSPECTIVE_API_HOST` | the same, from the environment, when `host` is not passed |
+
+The client appends `/v1alpha1/comments:analyze?key=…` to the host, as the original did to Google's.
 
 ### Specifying models
 
-The TOXICITY model is used by default. To specify additional models,
-    pass `options.attributes`.
+TOXICITY is requested by default. Pass `options.attributes` for others:
 
 ```js
-(async () => {
-  const text = 'fools!';
-  const result = await perspective.analyze(text, {attributes: ['unsubstantial', 'spam']});
-  console.log(JSON.stringify(result, null, 2));
-})();
-// {
-//   "attributeScores": {
-//     "UNSUBSTANTIAL": {
-//       "spanScores": [
-//         {
-//           "begin": 0,
-//           "end": 6,
-//           "score": {
-//             "value": 0.9592708,
-//             "type": "PROBABILITY"
-//           }
-//         }
-//       ],
-//       "summaryScore": {
-//         "value": 0.9592708,
-//         "type": "PROBABILITY"
-//       }
-//     },
-//     "SPAM": {
-//       "spanScores": [
-//         {
-//           "begin": 0,
-//           "end": 6,
-//           "score": {
-//             "value": 0.008744183,
-//             "type": "PROBABILITY"
-//           }
-//         }
-//       ],
-//       "summaryScore": {
-//         "value": 0.008744183,
-//         "type": "PROBABILITY"
-//       }
-//     }
-//   },
-//   "languages": [
-//     "en"
-//   ]
-// }
+const result = await perspective.analyze('fools!', {attributes: ['toxicity', 'insult', 'profanity']});
 ```
 
-### More options
+Unprofane serves TOXICITY, SEVERE_TOXICITY, IDENTITY_ATTACK, INSULT, PROFANITY, THREAT, SEXUALLY_EXPLICIT and FLIRTATION. It refuses the other New York Times attributes and the bridging ones (SPAM, UNSUBSTANTIAL, COMPASSION_EXPERIMENTAL and others) with the 400 Google gives a name it does not know, or drops them when the request sets `dropUnsupportedAttributes: true`.
 
-You can also pass an [AnalyzeComment](https://github.com/conversationai/perspectiveapi/blob/master/api_reference.md#analyzecomment-request)
-object for more control over the request.
+### Passing an AnalyzeComment object
 
 ```js
-(async () => {
-  const text = 'you empty-headed animal food trough wiper!';
-  const result = await perspective.analyze({
-    comment: {text},
-    requestedAttributes: {TOXICITY: {scoreThreshold: 0.7}},
-  });
-  console.log(JSON.stringify(result, null, 2));
-})();
-// {
-//   "attributeScores": {
-//     "TOXICITY": {
-//       "spanScores": [
-//         {
-//           "begin": 0,
-//           "end": 42,
-//           "score": {
-//             "value": 0.77587414,
-//             "type": "PROBABILITY"
-//           }
-//         }
-//       ],
-//       "summaryScore": {
-//         "value": 0.77587414,
-//         "type": "PROBABILITY"
-//       }
-//     }
-//   },
-//   "languages": [
-//     "en"
-//   ]
-// }
+const result = await perspective.analyze({
+  comment: {text: 'hooray for tests'},
+  requestedAttributes: {TOXICITY: {}, INSULT: {}},
+  languages: ['en'],
+});
 ```
 
-## API
+### Options
 
-### perspective = new Perspective()
+- `attributes`: the attributes to request, as an array of names or an object.
+- `doNotStore`: default `true`.
+- `stripHTML`: strip HTML tags from the text, default `true`.
+- `truncate`: cut text over 20,480 characters instead of refusing it, default `false`.
+- `validate`: refuse an empty or over-long text before sending, default `true`.
 
-#### analyze(text, [options])
+### Errors
 
-#### text
+`ResponseError` (from the API, with `error.response.status` and `error.response.data`), `TextEmptyError` and `TextTooLongError`, all subclasses of `PerspectiveAPIClientError`, as before.
 
-Type: `String` or `Object`
+## What changed from 3.1.0
 
-Either the text to analyze or an [AnalyzeComment](https://github.com/conversationai/perspectiveapi/blob/master/api_reference.md#analyzecomment-request) object.
-HTML tags will be stripped by default.
-
-##### options
-
-###### attributes
-
-Type: `Array` or `Object`
-
-Model names to analyze. `TOXICITY` is analyzed by default. If passing an Array of names, the names may be lowercased.
-See https://github.com/conversationai/perspectiveapi/blob/master/api_reference.md#models
-for a list of valid models.
-
-###### doNotStore
-
-Type: `Boolean`
-Default: `true`
-
-If `true`, prevent API from storing comment and context from this request.
-
-##### stripHTML
-
-Type: `Boolean`
-Default: `true`
-
-Whether to strip HTML tags from the text.
-
-##### truncate
-
-Type: `Boolean`
-Default: `false`
-
-If `true`, truncate text to the first 20480 characters (max length
-    allowed by the Perspective API).
-
-## FAQ
-
-### How does this compare to @conversationai/perspectiveapi-js-client?
-
-Similarities:
-
-- Exposes the AnalyzeComment endpoint of the Perspective API
-- Strips HTML tags by default
-
-Differences:
-
-
-- Returns full responses (rather than only returning summary scores)
-- Exposes all [AnalyzeComment](https://github.com/conversationai/perspectiveapi/blob/master/api_reference.md#analyzecomment-request) options
-- Supports all Node.js LTS versions
+- The host is configurable (`host`, `PERSPECTIVE_API_HOST`), Unprofane's by default.
+- Requests go through Node's built-in `fetch` (Node 18 or later); axios and lodash are gone. `error.response` keeps axios's `status`, `statusText`, `headers` and `data`.
+- An invalid text is refused without sending a request.
 
 ## License
 
-MIT © [Steven Loria](http://stevenloria.com)
+MIT. Copyright Steven Loria; changes since 3.1.0 copyright Unprofane.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.0.0 (2026-10-24)
+
+Published as `@unprofane/perspective-api-client`, maintained by Unprofane.
+
+- The host is configurable: `new Perspective({apiKey, host})` or `PERSPECTIVE_API_HOST`. The default is `https://api.unprofane.com`, a drop-in for Google's Perspective API, which stops answering after 2026-12-31.
+- Requests use Node's built-in `fetch`; Node 18 or later is required. axios and lodash are no longer dependencies. `ResponseError.response` keeps `status`, `statusText`, `headers` and `data`.
+- An empty or over-long text is refused without sending a request (3.1.0 sent it anyway after rejecting).
+- Tests run on `node:test`.
+
+
 ### 3.1.0 (2018-12-11)
 
 - Increase max text length to 20480 characters.

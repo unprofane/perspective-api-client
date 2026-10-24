@@ -1,0 +1,67 @@
+# Test every push on the Node versions the package supports. When
+# package.json names a version npm does not have yet, stage it on npm by
+# trusted publishing (no token, with provenance) and tag a release; a staged
+# version installs for nobody until a maintainer approves it with 2FA.
+name: release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+
+  release:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Staged publishing needs npm 11.15.0 or later.
+      - run: npm install -g npm@latest
+      - id: version
+        run: |
+          v=$(node -p "require('./package.json').version")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          # The first version was published by hand; trusted publishing
+          # takes over once the package exists.
+          if ! npm view @unprofane/perspective-api-client version > /dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif npm view "@unprofane/perspective-api-client@$v" version > /dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.version.outputs.publish == 'true'
+        run: npm stage publish
+      - if: steps.version.outputs.publish == 'true'
+        run: |
+          v="v${{ steps.version.outputs.version }}"
+          gh release view "$v" > /dev/null 2>&1 || gh release create "$v" --target "$GITHUB_SHA" --title "$v" --notes "See CHANGELOG.md. Staged on npm as @unprofane/perspective-api-client@${v#v}; installable once a maintainer approves it."
+        env:
+          GH_TOKEN: ${{ github.token }}
